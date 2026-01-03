@@ -1,6 +1,6 @@
 {
 	"name": "rune-sync",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build && npm run prepack",
@@ -29,12 +29,12 @@
 			"svelte": "./dist/index.js"
 		},
 		"./localforage": {
-			"svelte": "./dist/drivers/localforage.js",
-			"types": "./dist/drivers/localforage.d.ts"
+			"types": "./dist/drivers/localForage.d.ts",
+			"svelte": "./dist/drivers/localForage.js"
 		},
 		"./localstorage": {
-			"svelte": "./dist/drivers/localstorage.js",
-			"types": "./dist/drivers/localstorage.d.ts"
+			"types": "./dist/drivers/localStorage.d.ts",
+			"svelte": "./dist/drivers/localStorage.js"
 		}
 	},
 	"peerDependencies": {
@@ -67,7 +67,13 @@
 		"typescript-eslint": "^8.48.1",
 		"vite": "^7.2.6"
 	},
+	"license": "MIT",
 	"keywords": [
 		"svelte"
-	]
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/antepodeum/rune-sync"
+	},
+	"homepage": "https://github.com/antepodeum/rune-sync"
 }
