@@ -88,16 +88,6 @@ const syncState = createSyncState(myCustomSync);
 let appState = syncState('app-state', { counter: 0 });
 ```
 
-## Why Rune-Sync is Awesome
-
-- **Flexible Architecture**: Not tied to any specific storage solution
-- **Real-time Ready**: Built-in support for live updates and collaboration
-- **Performance Optimized**: Only saves when state actually changes
-- **SSR Friendly**: Works seamlessly in server-side rendering environments
-- **Developer Experience**: Simple API with full TypeScript support
-- **Extensible**: Easy to integrate with any backend or real-time technology
-- **Battle-Tested Patterns**: Inspired by proven state management solutions
-
 ## API Reference
 
 ### `createSyncState(synchronizer: StateSynchronizer)`
