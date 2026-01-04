@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { lfSync } from '$lib/drivers/localForage.js';
-	import { fade, fly, slide } from 'svelte/transition';
+	import { fly, slide } from 'svelte/transition';
 
 	// Page data from server
 	let { data } = $props();
@@ -56,16 +56,37 @@
 		fontSize: 100 // percentage
 	});
 
-	// Global UI State (Session only - not synced)
-	let uiState = $state({
-		newTodoText: '',
-		newNoteTitle: '',
-		newNoteContent: '',
-		activeTab: 'todos' as 'profile' | 'todos' | 'notes' | 'settings' | 'playground'
-	});
+	// Debounced Settings Demo (500ms delay)
+	const debouncedSettings = lfSync(
+		'app-settings',
+		{
+			theme: 'system', // 'light', 'dark', 'system'
+			language: 'en',
+			fontSize: 100 // percentage
+		},
+		{ debounce: 500 }
+	);
+
+	let uiState = lfSync(
+		'ui-state',
+		{
+			newTodoText: '',
+			newNoteTitle: '',
+			newNoteContent: '',
+			activeTab: 'todos' as 'profile' | 'todos' | 'notes' | 'settings' | 'playground',
+			mobileMenuOpen: false
+		},
+		{ debounce: 500, doNotSubscribe: true } // Do not subscribe to changes in other tabs
+	);
 
 	// Counter Demo
 	const counter = lfSync('counter', { value: 0 });
+
+	// Debounced Counter Demo (1000ms delay)
+	const debouncedCounter = lfSync('counter', { value: 0 }, { debounce: 1000 });
+
+	// Throttled Counter Demo (500ms delay)
+	const throttledCounter = lfSync('counter', { value: 0 }, { throttle: 500 });
 
 	// --- Derived & Helpers ---
 
@@ -225,7 +246,18 @@
 </svelte:head>
 
 <div class="app-layout">
-	<aside class="sidebar">
+	<!-- Mobile overlay -->
+	{#if uiState.mobileMenuOpen}
+		<button
+			class="mobile-overlay"
+			onclick={() => (uiState.mobileMenuOpen = false)}
+			onkeydown={(e) => e.key === 'Escape' && (uiState.mobileMenuOpen = false)}
+			aria-label="Close menu"
+			type="button"
+		></button>
+	{/if}
+
+	<aside class="sidebar" class:mobile-open={uiState.mobileMenuOpen}>
 		<div class="brand">
 			<div class="logo-icon">⚡</div>
 			<div>
@@ -238,7 +270,10 @@
 			{#each Object.entries(t.tabs) as [key, label]}
 				<button
 					class:active={uiState.activeTab === key}
-					onclick={() => (uiState.activeTab = key as any)}
+					onclick={() => {
+						uiState.activeTab = key as any;
+						uiState.mobileMenuOpen = false;
+					}}
 				>
 					<span class="nav-indicator"></span>
 					{label}
@@ -254,7 +289,25 @@
 
 	<main class="main-content">
 		<header class="top-bar">
-			<h2>{t.tabs[uiState.activeTab]}</h2>
+			<div class="header-left">
+				<button
+					class="mobile-menu-toggle"
+					onclick={() => (uiState.mobileMenuOpen = !uiState.mobileMenuOpen)}
+					aria-label="Toggle menu"
+				>
+					<svg
+						width="24"
+						height="24"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path d="M3 12h18M3 6h18M3 18h18" />
+					</svg>
+				</button>
+				<h2>{t.tabs[uiState.activeTab]}</h2>
+			</div>
 			<div class="user-chip">
 				<span class="avatar-small">{userProfile.avatar}</span>
 				<span class="username">{userProfile.name}</span>
@@ -274,16 +327,16 @@
 					</div>
 					<div class="form-grid">
 						<div class="input-group">
-							<label>{t.labels.name}</label>
-							<input type="text" bind:value={userProfile.name} />
+							<label for="profile-name">{t.labels.name}</label>
+							<input id="profile-name" type="text" bind:value={userProfile.name} />
 						</div>
 						<div class="input-group">
-							<label>{t.labels.location}</label>
-							<input type="text" bind:value={userProfile.location} />
+							<label for="profile-location">{t.labels.location}</label>
+							<input id="profile-location" type="text" bind:value={userProfile.location} />
 						</div>
 						<div class="input-group full-width">
-							<label>{t.labels.bio}</label>
-							<textarea bind:value={userProfile.bio} rows="3"></textarea>
+							<label for="profile-bio">{t.labels.bio}</label>
+							<textarea id="profile-bio" bind:value={userProfile.bio} rows="3"></textarea>
 						</div>
 					</div>
 				</div>
@@ -420,6 +473,64 @@
 							<button class="icon-btn" onclick={() => counter.value--}>−</button>
 							<button class="pill-btn" onclick={() => (counter.value = 0)}>{t.labels.reset}</button>
 							<button class="icon-btn" onclick={() => counter.value++}>+</button>
+						</div>
+					</div>
+
+					<div class="card counter-card">
+						<span class="counter-label">Debounced Counter (1000ms delay)</span>
+						<div class="counter-value">{debouncedCounter.value}</div>
+						<div class="counter-actions">
+							<button class="icon-btn" onclick={() => debouncedCounter.value--}>−</button>
+							<button class="pill-btn" onclick={() => (debouncedCounter.value = 0)}
+								>{t.labels.reset}</button
+							>
+							<button class="icon-btn" onclick={() => debouncedCounter.value++}>+</button>
+						</div>
+						<div class="debounce-info">
+							<small>Updates are delayed by 1 second</small>
+						</div>
+					</div>
+
+					<div class="card counter-card">
+						<span class="counter-label">Throttled Counter (500ms delay)</span>
+						<div class="counter-value">{throttledCounter.value}</div>
+						<div class="counter-actions">
+							<button class="icon-btn" onclick={() => throttledCounter.value--}>−</button>
+							<button class="pill-btn" onclick={() => (throttledCounter.value = 0)}
+								>{t.labels.reset}</button
+							>
+							<button class="icon-btn" onclick={() => throttledCounter.value++}>+</button>
+						</div>
+						<div class="debounce-info">
+							<small>Updates are throttled once per 500ms</small>
+						</div>
+					</div>
+
+					<div class="card settings-card">
+						<span class="counter-label">Debounced Settings (500ms delay)</span>
+						<div class="settings-grid">
+							<div class="setting-item">
+								<label for="debounced-language">Language</label>
+								<select id="debounced-language" bind:value={debouncedSettings.language}>
+									<option value="en">English</option>
+									<option value="ru">Русский</option>
+									<option value="es">Español</option>
+								</select>
+							</div>
+							<div class="setting-item">
+								<label for="debounced-fontsize">Font Size</label>
+								<input
+									id="debounced-fontsize"
+									type="range"
+									min="80"
+									max="120"
+									bind:value={debouncedSettings.fontSize}
+								/>
+								<span class="range-value">{debouncedSettings.fontSize}%</span>
+							</div>
+						</div>
+						<div class="debounce-info">
+							<small>Settings are saved after 500ms of inactivity</small>
 						</div>
 					</div>
 				</div>
@@ -659,9 +770,7 @@
 		padding: 1.5rem;
 	}
 
-	/* INPUT FIXES for Dark Mode */
 	input[type='text'],
-	input[type='number'],
 	textarea,
 	select {
 		width: 100%;
@@ -998,9 +1107,11 @@
 	/* Playground (Counter Fixes) */
 	.playground-container {
 		display: flex;
-		justify-content: center;
+		flex-direction: column;
+		justify-content: flex-start;
 		align-items: center;
-		height: 100%;
+		gap: 2rem;
+		padding: 2rem;
 	}
 	.counter-card {
 		text-align: center;
@@ -1019,6 +1130,59 @@
 		gap: 0.75rem;
 		justify-content: center;
 		align-items: center;
+	}
+
+	.debounce-info {
+		margin-top: 1rem;
+		padding: 0.5rem;
+		background: var(--bg-app);
+		border-radius: var(--radius-md);
+		color: var(--text-muted);
+	}
+
+	.settings-card {
+		min-width: 400px;
+		text-align: left;
+	}
+
+	.settings-grid {
+		display: flex;
+		flex-direction: column;
+		gap: 1.5rem;
+		margin: 1.5rem 0;
+	}
+
+	.setting-item {
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.setting-item label {
+		font-weight: 600;
+		color: var(--text-main);
+		font-size: 0.875rem;
+	}
+
+	.setting-item select,
+	.setting-item input[type='range'] {
+		width: 100%;
+		padding: 0.5rem;
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		background: var(--bg-app);
+		color: var(--text-main);
+	}
+
+	.setting-item input[type='range'] {
+		padding: 0;
+	}
+
+	.setting-item .range-value {
+		text-align: center;
+		font-weight: 600;
+		color: var(--primary);
+		margin-top: 0.25rem;
 	}
 
 	/* Fixed Counter Buttons */
@@ -1062,34 +1226,198 @@
 		transform: translateY(1px);
 	}
 
+	.mobile-menu-toggle {
+		display: none;
+	}
+
 	/* Mobile Responsive */
 	@media (max-width: 768px) {
 		.app-layout {
 			grid-template-columns: 1fr;
 			grid-template-rows: auto 1fr;
 		}
-		.sidebar {
-			display: none;
+
+		.mobile-overlay {
+			position: fixed;
+			top: 0;
+			left: 0;
+			right: 0;
+			bottom: 0;
+			background: rgba(0, 0, 0, 0.5);
+			z-index: 20;
+			backdrop-filter: blur(4px);
 		}
+
+		.sidebar {
+			position: fixed;
+			top: 0;
+			left: -100%;
+			width: 280px;
+			height: 100vh;
+			z-index: 30;
+			transition: left 0.3s ease;
+			box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+		}
+
+		.sidebar.mobile-open {
+			left: 0;
+		}
+
 		.main-content {
 			height: 100vh;
 		}
+
 		.top-bar {
 			padding: 0 1rem;
 		}
+
+		.header-left {
+			display: flex;
+			align-items: center;
+			gap: 1rem;
+		}
+
+		.mobile-menu-toggle {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			width: 40px;
+			height: 40px;
+			border: none;
+			background: transparent;
+			border-radius: var(--radius-md);
+			cursor: pointer;
+			color: var(--text-main);
+			transition: background 0.2s;
+		}
+
+		.mobile-menu-toggle:hover {
+			background: var(--bg-app);
+		}
+
 		.content-wrapper {
 			padding: 1rem;
 		}
+
 		.profile-card {
 			flex-direction: column;
 			align-items: center;
 			text-align: center;
 		}
+
 		.form-grid {
 			grid-template-columns: 1fr;
 		}
+
 		.full-width {
 			grid-column: auto;
+		}
+
+		.notes-grid {
+			grid-template-columns: 1fr;
+		}
+
+		.todo-container,
+		.settings-container {
+			max-width: 100%;
+		}
+
+		.input-row {
+			flex-direction: column;
+			gap: 0.5rem;
+		}
+
+		.input-row input {
+			border-radius: var(--radius-md);
+			padding-left: 0.75rem;
+		}
+
+		.btn-circle {
+			width: 100%;
+			height: auto;
+			border-radius: var(--radius-md);
+			padding: 0.75rem;
+		}
+
+		.playground-container {
+			padding: 1rem;
+		}
+
+		.counter-card,
+		.settings-card {
+			min-width: auto;
+			width: 100%;
+		}
+
+		.counter-value {
+			font-size: 3rem;
+		}
+
+		.setting-row {
+			flex-direction: column;
+			align-items: flex-start;
+			gap: 0.5rem;
+		}
+
+		.segmented-control {
+			width: 100%;
+		}
+
+		.user-chip .username {
+			display: none;
+		}
+
+		.avatar-small {
+			font-size: 1.2rem;
+		}
+	}
+
+	@media (max-width: 480px) {
+		.sidebar {
+			width: 100%;
+			left: -100%;
+		}
+
+		.sidebar.mobile-open {
+			left: 0;
+		}
+
+		.content-wrapper {
+			padding: 0.75rem;
+		}
+
+		.top-bar {
+			height: 60px;
+			padding: 0 0.75rem;
+		}
+
+		.brand {
+			padding: 1rem;
+		}
+
+		.logo-icon {
+			width: 32px;
+			height: 32px;
+			font-size: 1rem;
+		}
+
+		.brand h1 {
+			font-size: 1rem;
+		}
+
+		nav button {
+			padding: 1rem;
+			font-size: 1rem;
+		}
+
+		.counter-value {
+			font-size: 2.5rem;
+		}
+
+		.avatar-xl {
+			width: 80px;
+			height: 80px;
+			font-size: 3rem;
 		}
 	}
 </style>

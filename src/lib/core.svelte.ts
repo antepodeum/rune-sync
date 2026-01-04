@@ -1,32 +1,34 @@
-import { tick } from 'svelte';
-import type { StateSynchronizer, syncState } from './types.js';
+import { tick, untrack } from 'svelte';
+import type { StateSynchronizer, syncState, SyncSettings } from './types.js';
 
 function deepEqual(a: unknown, b: unknown): boolean {
 	if (a === b) return true;
 	if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
-
 	const aKeys = Object.keys(a);
 	const bKeys = Object.keys(b);
 	if (aKeys.length !== bKeys.length) return false;
-
 	const objA = a as Record<string, unknown>;
 	const objB = b as Record<string, unknown>;
-
 	for (const key of aKeys) {
 		if (!deepEqual(objA[key], objB[key])) return false;
 	}
 	return true;
 }
 
-export function createSyncState(
-	synchronizer: StateSynchronizer
-): <T extends syncState>(key: string, initialValue: T) => T {
-	return function <T extends syncState>(key: string, initialValue: T): T {
+export function createSyncState(synchronizer: StateSynchronizer) {
+	return function <T extends syncState>(
+		key: string,
+		initialValue: T,
+		settings: SyncSettings = {}
+	): T {
 		const state = $state(initialValue);
 
 		let isInitialized = false;
 		let isRemoteUpdating = false;
 		let lastSaved: T | undefined = undefined;
+
+		let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+		let lastThrottleTime = 0;
 
 		if (typeof window !== 'undefined') {
 			Promise.resolve(synchronizer.read<T>(key)).then((saved) => {
@@ -39,7 +41,7 @@ export function createSyncState(
 				isInitialized = true;
 			});
 
-			if (synchronizer.subscribe) {
+			if (synchronizer.subscribe && !settings.doNotSubscribe) {
 				$effect(() => {
 					const unsubscribe = synchronizer.subscribe!<T>(key, (remoteValue) => {
 						isRemoteUpdating = true;
@@ -50,10 +52,7 @@ export function createSyncState(
 							isRemoteUpdating = false;
 						});
 					});
-
-					return () => {
-						unsubscribe();
-					};
+					return () => unsubscribe();
 				});
 			}
 
@@ -62,8 +61,28 @@ export function createSyncState(
 
 				if (isInitialized && !isRemoteUpdating) {
 					if (!deepEqual(snapshot, lastSaved)) {
-						synchronizer.write(key, snapshot as T);
-						lastSaved = structuredClone(snapshot as T);
+						const runWrite = () => {
+							untrack(() => {
+								synchronizer.write(key, snapshot as T);
+								lastSaved = structuredClone(snapshot as T);
+							});
+						};
+
+						if (settings.throttle) {
+							const now = Date.now();
+							if (now - lastThrottleTime >= settings.throttle) {
+								lastThrottleTime = now;
+								runWrite();
+							}
+							return;
+						}
+
+						if (settings.debounce) {
+							if (debounceTimer) clearTimeout(debounceTimer);
+							debounceTimer = setTimeout(runWrite, settings.debounce);
+						} else {
+							runWrite();
+						}
 					}
 				}
 			});
