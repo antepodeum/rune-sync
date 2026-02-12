@@ -196,10 +196,6 @@ interface StateSynchronizer {
 }
 ```
 
-## Contributing
-
-We welcome contributions! Please see our [contributing guidelines](CONTRIBUTING.md) for details.
-
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.

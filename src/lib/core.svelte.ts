@@ -1,6 +1,15 @@
 import { tick, untrack, onDestroy } from 'svelte';
 import type { StateSynchronizer, syncState, SyncSettings } from './types.js';
 
+function replaceState(target: Record<string, unknown>, source: Record<string, unknown>): void {
+	for (const key of Object.keys(target)) {
+		if (!(key in source)) {
+			delete target[key];
+		}
+	}
+	Object.assign(target, source);
+}
+
 function deepEqual(a: unknown, b: unknown): boolean {
 	if (a === b) return true;
 	if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
@@ -34,7 +43,7 @@ export function createSyncState(synchronizer: StateSynchronizer) {
 				untrack(() => {
 					Promise.resolve(synchronizer.read<T>(key)).then((saved) => {
 						if (saved) {
-							Object.assign(state, saved);
+							replaceState(state, saved);
 							lastSaved = structuredClone(saved);
 						} else {
 							lastSaved = structuredClone(initialValue);
@@ -47,7 +56,7 @@ export function createSyncState(synchronizer: StateSynchronizer) {
 					$effect(() => {
 						const unsubscribe = synchronizer.subscribe!<T>(key, (remoteValue) => {
 							isRemoteUpdating = true;
-							Object.assign(state, remoteValue);
+							replaceState(state, remoteValue);
 							lastSaved = structuredClone(remoteValue);
 							tick().then(() => (isRemoteUpdating = false));
 						});
