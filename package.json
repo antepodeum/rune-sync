@@ -35,6 +35,10 @@
 		"./localstorage": {
 			"types": "./dist/drivers/localStorage.d.ts",
 			"svelte": "./dist/drivers/localStorage.js"
+		},
+		"./cookie": {
+			"types": "./dist/drivers/cookie.d.ts",
+			"svelte": "./dist/drivers/cookie.js"
 		}
 	},
 	"peerDependencies": {

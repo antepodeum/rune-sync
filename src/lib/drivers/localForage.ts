@@ -12,8 +12,8 @@ export const lfSynchronizer: StateSynchronizer = {
 				const channel = new BroadcastChannel(`lf-sync-${key}`);
 				channel.postMessage(val);
 				channel.close();
-			} catch (error) {
-				console.warn('BroadcastChannel not available:', error);
+			} catch {
+				// BroadcastChannel not available
 			}
 		}
 
@@ -31,8 +31,8 @@ export const lfSynchronizer: StateSynchronizer = {
 			try {
 				broadcastChannel = new BroadcastChannel(`lf-sync-${key}`);
 				broadcastChannel.addEventListener('message', handleBroadcastMessage);
-			} catch (error) {
-				console.warn('BroadcastChannel not available:', error);
+			} catch {
+				// BroadcastChannel not available
 			}
 		}
 
