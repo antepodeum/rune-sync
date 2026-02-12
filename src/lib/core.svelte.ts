@@ -37,6 +37,7 @@ export function createSyncState(synchronizer: StateSynchronizer) {
 			let isRemoteUpdating = false;
 			let lastSaved: T | undefined = undefined;
 			let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+			let throttleTimer: ReturnType<typeof setTimeout> | null = null;
 			let lastThrottleTime = 0;
 
 			if (typeof window !== 'undefined') {
@@ -81,7 +82,23 @@ export function createSyncState(synchronizer: StateSynchronizer) {
 						const now = Date.now();
 						if (now - lastThrottleTime >= settings.throttle) {
 							lastThrottleTime = now;
+							if (throttleTimer) {
+								clearTimeout(throttleTimer);
+								throttleTimer = null;
+							}
 							runWrite();
+						} else {
+							// Schedule trailing call with the latest snapshot
+							if (throttleTimer) clearTimeout(throttleTimer);
+							const trailingSnapshot = snapshot as T;
+							throttleTimer = setTimeout(() => {
+								lastThrottleTime = Date.now();
+								throttleTimer = null;
+								untrack(() => {
+									synchronizer.write(key, trailingSnapshot);
+									lastSaved = structuredClone(trailingSnapshot);
+								});
+							}, settings.throttle - (now - lastThrottleTime));
 						}
 						return;
 					}
