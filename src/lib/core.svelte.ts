@@ -42,15 +42,21 @@ export function createSyncState(synchronizer: StateSynchronizer) {
 
 			if (typeof window !== 'undefined') {
 				untrack(() => {
-					Promise.resolve(synchronizer.read<T>(key)).then((saved) => {
-						if (saved) {
-							replaceState(state, saved);
-							lastSaved = structuredClone(saved);
-						} else {
+					Promise.resolve(synchronizer.read<T>(key))
+						.then((saved) => {
+							if (saved) {
+								replaceState(state, saved);
+								lastSaved = structuredClone(saved);
+							} else {
+								lastSaved = structuredClone(initialValue);
+							}
+						})
+						.catch(() => {
 							lastSaved = structuredClone(initialValue);
-						}
-						isInitialized = true;
-					});
+						})
+						.finally(() => {
+							isInitialized = true;
+						});
 				});
 
 				if (synchronizer.subscribe && !settings.doNotSubscribe) {
@@ -91,14 +97,17 @@ export function createSyncState(synchronizer: StateSynchronizer) {
 							// Schedule trailing call with the latest snapshot
 							if (throttleTimer) clearTimeout(throttleTimer);
 							const trailingSnapshot = snapshot as T;
-							throttleTimer = setTimeout(() => {
-								lastThrottleTime = Date.now();
-								throttleTimer = null;
-								untrack(() => {
-									synchronizer.write(key, trailingSnapshot);
-									lastSaved = structuredClone(trailingSnapshot);
-								});
-							}, settings.throttle - (now - lastThrottleTime));
+							throttleTimer = setTimeout(
+								() => {
+									lastThrottleTime = Date.now();
+									throttleTimer = null;
+									untrack(() => {
+										synchronizer.write(key, trailingSnapshot);
+										lastSaved = structuredClone(trailingSnapshot);
+									});
+								},
+								settings.throttle - (now - lastThrottleTime)
+							);
 						}
 						return;
 					}
@@ -110,6 +119,11 @@ export function createSyncState(synchronizer: StateSynchronizer) {
 					} else {
 						runWrite();
 					}
+
+					return () => {
+						if (debounceTimer) clearTimeout(debounceTimer);
+						if (throttleTimer) clearTimeout(throttleTimer);
+					};
 				});
 			}
 		});

@@ -4,7 +4,12 @@ import type { StateSynchronizer } from '../types.js';
 export const localStorageSync: StateSynchronizer = {
 	read: (key: string) => {
 		const raw = localStorage.getItem(key);
-		return raw ? JSON.parse(raw) : null;
+		if (!raw) return null;
+		try {
+			return JSON.parse(raw);
+		} catch {
+			return null;
+		}
 	},
 
 	write: (key: string, val: unknown) => {
