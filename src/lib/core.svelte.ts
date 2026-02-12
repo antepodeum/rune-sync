@@ -13,13 +13,12 @@ function replaceState(target: Record<string, unknown>, source: Record<string, un
 function deepEqual(a: unknown, b: unknown): boolean {
 	if (a === b) return true;
 	if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
-	const aKeys = Object.keys(a);
-	const bKeys = Object.keys(b);
-	if (aKeys.length !== bKeys.length) return false;
-	for (let i = 0; i < aKeys.length; i++) {
-		const key = aKeys[i] as keyof typeof a;
-
-		if (!deepEqual(a[key], b[key])) return false;
+	const aObj = a as Record<string, unknown>;
+	const bObj = b as Record<string, unknown>;
+	const aKeys = Object.keys(aObj);
+	if (aKeys.length !== Object.keys(bObj).length) return false;
+	for (const key of aKeys) {
+		if (!Object.hasOwn(bObj, key) || !deepEqual(aObj[key], bObj[key])) return false;
 	}
 	return true;
 }
@@ -79,11 +78,10 @@ export function createSyncState(synchronizer: StateSynchronizer) {
 					const runWrite = () => {
 						untrack(() => {
 							synchronizer.write(key, snapshot as T);
-							lastSaved = structuredClone(snapshot as T);
+							lastSaved = snapshot as T;
 						});
 					};
 
-					// Throttle
 					if (settings.throttle) {
 						const now = Date.now();
 						if (now - lastThrottleTime >= settings.throttle) {
@@ -103,17 +101,13 @@ export function createSyncState(synchronizer: StateSynchronizer) {
 									throttleTimer = null;
 									untrack(() => {
 										synchronizer.write(key, trailingSnapshot);
-										lastSaved = structuredClone(trailingSnapshot);
+										lastSaved = trailingSnapshot;
 									});
 								},
 								settings.throttle - (now - lastThrottleTime)
 							);
 						}
-						return;
-					}
-
-					// Debounce
-					if (settings.debounce) {
+					} else if (settings.debounce) {
 						if (debounceTimer) clearTimeout(debounceTimer);
 						debounceTimer = setTimeout(runWrite, settings.debounce);
 					} else {
